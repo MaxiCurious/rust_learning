@@ -4,7 +4,6 @@ use reqwest::Client;
 use select::document::Document;
 use select::predicate::Name;
 
-
 async fn get_body_from(client: &Client, url: &str) -> String{
     let response = client.get(url).send().await.unwrap().text().await;  
     return response.expect("");     
