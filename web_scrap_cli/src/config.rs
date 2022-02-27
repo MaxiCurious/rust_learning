@@ -1,21 +1,10 @@
 use std::env;
-use std::path::Path;
 use clap::Parser;
 use std::error::Error;
-use std::fs::File;
-use std::io::Read;
 use yaml_rust::YamlLoader;
 
-pub fn get_file_content(filepath: String) -> Result<String, Box<dyn Error>> {   
+use  super::file_utils;
 
-    let full_filepath = Path::new(&filepath);
-    println!("Loading credential info from file: {}", full_filepath.canonicalize()?.display() );
-
-    let mut config_file = File::open(full_filepath)?;   
-    let mut content = String::new();
-    config_file.read_to_string(&mut content)?;
-    Ok(content)
-}
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -57,7 +46,7 @@ impl Config{
         println!("Current dir : {:?}", std::env::current_dir());
         println!("Current exe: {:?}", std::env::current_exe());
 
-        let content = get_file_content((&yaml_cfg).to_string()).expect("Can't get yaml file content !");
+        let content = file_utils::get_file_content((&yaml_cfg).to_string()).expect("Can't get yaml file content !");
         return Config::new_from_yaml_string(&content);
     }
 
@@ -96,13 +85,17 @@ mod tests {
         "#;
         let config = Config::new_from_yaml_string(&fake_yaml_content);
         assert!(config.is_ok(), "{}", format!("config = {:#?}", config));  
+
         let config_ok = &config.unwrap();
-        assert_eq!(&config_ok.url, &"https://www.google.fr".to_string());
+        match &config_ok.url {
+            Some(v) => assert_eq!(v, &"https://www.google.fr".to_string()),
+            _ => panic!("config_ok.url shouldn't be None !")
+        }
+        
         match &config_ok.selector {
             Some(v) => assert_eq!(v, &"div".to_string()),
             _ => ()
-        }
-        
+        }        
         
     }
 

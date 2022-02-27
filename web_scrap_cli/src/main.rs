@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::time::{SystemTime, UNIX_EPOCH};
 use reqwest::Client;
 use clap::Parser;
 
@@ -7,6 +8,9 @@ use config::{Args, Config};
 
 mod scrap_utils;
 use scrap_utils::*;
+
+mod file_utils;
+use file_utils::save_records_to_csv;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>>{    
@@ -32,12 +36,25 @@ pub async fn run(config: Config) -> Result<(), Box<dyn Error>>{
     match &config.url{
         Some(valid_url) => {
             print_all_links(&client, valid_url).await;
+            
             match &config.selector {
                 Some(v) => {
+                    println!("\nExtracting '{}' CSS Selector items ...", v);
                     let text_items = get_css_selector_items(&client, valid_url, v).await;
-                    for t in text_items{
-                        println!("{}", t);
+                    let mut records = Vec::new();
+                    let timestamp = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .expect("Timestamp error !");
+                    //println!("Current timestamp={}", timestamp.as_secs_f32());
+                    for item in &text_items{
+                        println!("{}", item);
+                        records.push(SelectorRecord{timestamp: timestamp.as_secs(),
+                                                    selector: v,
+                                                    content: item});
                     }
+                    save_records_to_csv(&records, 
+                        std::env::current_dir()?.join(format!("selector_items_{}.csv", timestamp.as_secs()))
+                    )?;
                 },
                 _ => println!("No CSS Selector used")
             }   
