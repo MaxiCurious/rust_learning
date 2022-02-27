@@ -4,7 +4,7 @@ use std::io::Read;
 use std::path::Path;
 use csv::{Reader, ReaderBuilder};
 
-use  super::scrap_utils;
+use  super::scrap_utils::SelectorRecord;
 
 pub fn get_file_content(filepath: String) -> Result<String, Box<dyn Error>> {   
     // return the file content as a String
@@ -26,7 +26,20 @@ pub fn _get_csv_reader(filepath: String, delim: u8) -> Result<Reader<File>, Box<
     return Ok(reader);
 }
 
-pub fn save_records_to_csv<P:AsRef<Path>>(records: &Vec<scrap_utils::SelectorRecord>, outputfilepath: P) -> Result<(), Box<dyn Error>>{
+pub fn _get_selector_records_from_csv(filepath: String, delim: u8) -> Result<(), Box<dyn Error>>{
+    let mut reader = _get_csv_reader(filepath, delim)?;
+    let mut raw_record = csv::ByteRecord::new();
+    let headers = reader.byte_headers()?.clone();
+    let mut _records: Vec<SelectorRecord> = Vec::new();
+
+    while reader.read_byte_record(&mut raw_record)? {
+        let _record: SelectorRecord = raw_record.deserialize(Some(&headers))?;
+        //records.push(record.clone());        
+    }
+    Ok(())
+}
+
+pub fn save_records_to_csv<P:AsRef<Path>>(records: &Vec<SelectorRecord>, outputfilepath: P) -> Result<(), Box<dyn Error>>{
     let mut wtr = csv::Writer::from_path(outputfilepath)?;
 
     // When writing records with Serde using structs, the header row is written

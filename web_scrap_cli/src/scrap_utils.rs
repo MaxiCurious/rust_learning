@@ -2,9 +2,10 @@ use scraper::{Html, Selector};
 use reqwest::Client;
 use select::document::Document;
 use select::predicate::Name;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub struct SelectorRecord<'a> {
     pub timestamp: u64,
     pub selector: &'a str,
