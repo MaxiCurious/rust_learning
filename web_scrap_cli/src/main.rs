@@ -2,7 +2,7 @@ use std::error::Error;
 use std::time::Instant;
 use reqwest::Client;
 use clap::Parser;
-
+use rusqlite::Connection;
 
 mod config;
 use config::{Args, Config};
@@ -12,6 +12,7 @@ use scrap_utils::*;
 
 mod file_utils;
 
+const CSV_NAME_PREFIX: &str = "selector_items_";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>>{    
@@ -22,7 +23,7 @@ async fn main() -> Result<(), Box<dyn Error>>{
     config.print_info();    
 
     if let Err(error) = run(config).await {
-        println!("Run error: {:?}", error)        
+        println!("Application error: {:?}", error)        
     }
 
     return Ok(())
@@ -44,7 +45,20 @@ pub async fn run(config: Config) -> Result<(), Box<dyn Error>>{
             println!("-------------------\nTime elapsed is: {:?}\n", duration);
 
             match &config.selector {
-                Some(v) => extract_selector_records_to_csv(content.as_str(), valid_url, v).await,
+                Some(selector) => {                    
+                    let conn: Option<Connection>; 
+                    match config.db_path {
+                        Some(p) => conn = Some(Connection::open(&p)?),
+                        _ => conn = None
+                    }; 
+                    extract_selector_records(content.as_str(), 
+                                            valid_url, 
+                                            selector, 
+                                            config.save_to_csv, 
+                                            conn,
+                                            &config.table
+                                            ).await?
+                    },
                 _ => println!("No CSS Selector used")
             } 
             duration = start.elapsed();
