@@ -1,2 +1,2 @@
-url: "http://www.google.fr"
-selector: "p"
+url: "https://fr.news.yahoo.com/?guccounter=1&guce_referrer=aHR0cHM6Ly93d3cuZ29vZ2xlLmNvbS8&guce_referrer_sig=AQAAAKbJDEnUGKfMYmtbov-q2qSdvS1HIZMN7tElsBYh-SXQ_tkCDcW-BZy9E-VDsr1xeNSyMyGDCtPrapM-z1pBk7K5RrvAT6orCFRJZf3P9o2A4oDeAYvn_cde-oR7WW1-3cjFY30m-5sSq-kDEl-fiJpf1eaVtGvRyQ7psH05QrPT"
+selector: "h3"
