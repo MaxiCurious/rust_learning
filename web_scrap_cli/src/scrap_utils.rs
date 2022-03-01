@@ -51,7 +51,7 @@ fn get_timestamp_now() -> u64{
 }
 
 pub async fn extract_selector_records(content: &str, valid_url: &str, selector: &str, 
-                                    save_to_csv: bool, db_conn:Option<Connection>, 
+                                    save_to_csv: bool, db_conn: &Option<Connection>, 
                                     table_name: &str) -> Result<(), Box<dyn Error>>{
     
     println!("\nExtracting '{}' CSS Selector items ...", selector);  

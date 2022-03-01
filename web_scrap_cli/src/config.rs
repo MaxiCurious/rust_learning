@@ -24,7 +24,7 @@ pub struct Args {
     #[clap(short, long, default_value="selector_record", help="Save result to given table, default to 'selector_record'")]
     pub table: String,
 
-    #[clap(long, help="Save results to a csv ")]
+    #[clap(long, help="Save results to a csv file")]
     pub to_csv: bool,    
 }
 
@@ -32,27 +32,38 @@ impl Args{
     pub fn build_config(&self) -> Config{
         let config: Config = match &self.yaml_cfg {
             Some(v) => Config::new_from_yaml_file(v, &self.to_csv, &self.db).unwrap(),
-            _ => Config::new(&self.url, &self.selector, &self.to_csv, &self.db, &self.table)
+            _ => {
+                let mut url_selector_vec = Vec::new();
+                url_selector_vec.push(
+                    UrlSelectorPair{url: self.url.as_ref().unwrap().to_string(),
+                                    selector: self.selector.as_ref().unwrap().to_string()}
+                );
+                Config::new(&url_selector_vec, &self.to_csv, &self.db, &self.table)
+            }
         };
         return config;
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct UrlSelectorPair{
+    pub url: String,
+    pub selector: String
+}
+
 #[derive(Debug)]
 pub struct Config{
-    pub url: Option<String>,
-    pub selector: Option<String>,
+    pub url_selectors: Vec<UrlSelectorPair>,
     pub save_to_csv: bool,
     pub db_path: Option<String>,
     pub table: String,
-    pub env_arg1: bool,
+    pub env_arg1: bool
 }
 
 impl Config{
-    pub fn new(url: &Option<String>, selector: &Option<String>, save_to_csv:&bool, db_path: &Option<String>, table: &String) -> Config{   
+    pub fn new(url_selectors: &Vec<UrlSelectorPair>, save_to_csv:&bool, db_path: &Option<String>, table: &String) -> Config{   
         let env_arg1 = env::var("WEB_SCRAP_CLI_ARG1").is_err();        
-        return Config {url: url.clone(), 
-            selector: selector.clone(), 
+        return Config {url_selectors: url_selectors.clone(), 
             save_to_csv: save_to_csv.clone(),
             db_path: db_path.clone(),
             table: table.clone(),
@@ -71,22 +82,20 @@ impl Config{
         let yaml_vec = YamlLoader::load_from_str(yaml_content)?;   
         let yaml = &yaml_vec[0] ;
 
-        let url = yaml["url"].as_str().map(|s| s.to_string());
-        let selector = yaml["selector"].as_str().map(|s| s.to_string());
-        return Ok(Config::new(&url, &selector, save_to_csv, db_path, &String::from("selector_record")));
+        let url_selector_tuples = yaml["url_selector_tuples"].as_vec().expect("Couldn't find 'url_selevtor_tuples' list in the yaml !");
+        let mut url_selectors: Vec<UrlSelectorPair> = Vec::new();
+        let mut yaml_item;
+        for elem in url_selector_tuples {
+            yaml_item = elem.as_vec().unwrap();
+            url_selectors.push(
+                UrlSelectorPair{url: yaml_item[0].as_str().unwrap().to_string(),
+                                selector: yaml_item[1].as_str().unwrap().to_string()})
+        }
+        return Ok(Config::new(&url_selectors, save_to_csv, db_path, &String::from("selector_record")));
     }
 
     pub fn print_info(&self){
-        match &self.url {
-            Some(v) => println!("Config.url = '{}'", v),
-            _ => println!("Config.url = None")
-        } 
-        match &self.selector {
-            Some(v) => println!("Config.selector = '{}'", v),
-            _ => println!("Config.selector = None")
-        }  
-        println!("Config.env_arg1 = '{}'", &self.env_arg1);             
-        
+        println!("{:?}", &self);
     }
 }
 
@@ -97,23 +106,36 @@ mod tests {
     #[test]
     fn test_new_from_yaml_ok() {
         let fake_yaml_content: &str = r#"
-        url: "https://www.google.fr"
-        selector: "div"
+        url_selector_tuples: 
+            - [https://www.google.fr, div]
         "#;
         let config = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
         assert!(config.is_ok(), "{}", format!("config = {:#?}", config));  
 
         let config_ok = &config.unwrap();
-        match &config_ok.url {
-            Some(v) => assert_eq!(v, &"https://www.google.fr".to_string()),
-            _ => panic!("config_ok.url shouldn't be None !")
-        }
+        let url_selector:&UrlSelectorPair = &config_ok.url_selectors[0];
+        assert_eq!(url_selector.url, "https://www.google.fr".to_string());
+        assert_eq!(url_selector.selector, "div".to_string());          
         
-        match &config_ok.selector {
-            Some(v) => assert_eq!(v, &"div".to_string()),
-            _ => ()
-        }        
-        
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_new_from_yaml_wrong_list_panic() {
+        let fake_yaml_content: &str = r#"
+        wrong_list_name: 
+            - [https://www.google.fr, div]
+        "#;
+        _ = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
+    }
+    #[test]
+    #[should_panic]
+    fn test_new_from_yaml_missing_item_panic() {
+        let fake_yaml_content: &str = r#"
+        url_selector_tuples: 
+            - [https://www.google.fr]
+        "#;
+        _ = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
     }
 
 }
