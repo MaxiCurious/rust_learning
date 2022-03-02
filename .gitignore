@@ -12,3 +12,5 @@ Cargo.lock
 # generated files
 **/*.csv
 **/test_temp/
+**/*.db
+*.db

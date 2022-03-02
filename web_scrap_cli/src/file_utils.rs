@@ -2,9 +2,17 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use csv::{Reader, ReaderBuilder};
 
 use  super::scrap_utils::SelectorRecord;
+
+pub fn get_timestamp_now() -> u64{
+    return SystemTime::now().duration_since(UNIX_EPOCH)
+                        .expect("Timestamp error !")
+                        .as_secs(); 
+}
 
 pub fn get_file_content(filepath: String) -> Result<String, Box<dyn Error>> {   
     // return the file content as a String
@@ -39,7 +47,7 @@ pub fn _get_selector_records_from_csv(filepath: String, delim: u8) -> Result<(),
     Ok(())
 }
 
-pub fn save_records_to_csv<P:AsRef<Path>>(records: &Vec<SelectorRecord>, outputfilepath: P) -> Result<(), Box<dyn Error>>{
+pub async fn save_records_to_csv<P:AsRef<Path>>(records: &Vec<SelectorRecord>, outputfilepath: P) -> Result<(), Box<dyn Error>>{
     let mut wtr = csv::Writer::from_path(outputfilepath)?;
 
     // When writing records with Serde using structs, the header row is written

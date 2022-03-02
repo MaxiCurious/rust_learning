@@ -15,6 +15,10 @@ mod scrap_utils;
 use scrap_utils::*;
 
 mod file_utils;
+use file_utils::{save_records_to_csv, get_timestamp_now};
+
+mod db_utils;
+use db_utils::save_selector_records_to_db;
 
 // Not in parallel : Total duration = 1.9254413 sec.
 
@@ -37,8 +41,9 @@ fn main() -> Result<()>{
     let args = Args::parse();
     let config = args.build_config();
     config.print_info();    
-
-    // Start async tasks
+    println!("-------------------\nDuration to build config is: {:?}\n", start.elapsed());
+      
+    // Start asynced work
     let rt = tokio::runtime::Runtime::new().unwrap();    
     match rt.block_on(run(config)) {
         Ok(_) => info!("Done"),
@@ -51,55 +56,73 @@ fn main() -> Result<()>{
 
 pub async fn run(config: Config) -> Result<()>{    
     
-    let mut futures = vec![];
+    let client = Client::builder().cookie_store(true).build()?;
+
+    // separate threads for parrallism
+    let mut futures = vec![];    
     for url_selector in &config.url_selectors {
-        let fut = task::spawn(handle_request(url_selector.clone())
+        let fut = task::spawn(handle_request(client.clone(), url_selector.clone())
         );
         futures.push(fut);               
     }
+
+    // Retrieve all selector items 
     let results = join_all(futures).await;
 
-    // Extract selector items and save in csv or db
-    let conn: Option<Connection>; 
-    match &config.db_path {
-        Some(p) => conn = Some(Connection::open(&p)?),
-        _ => conn = None
+    // Setup db connection if required
+    let mut conn: Option<Connection> = match &config.db_path {
+        Some(p) => {
+            let new_conn: Connection = Connection::open(&p).unwrap();
+            new_conn.execute_batch("PRAGMA journal_mode = OFF;
+                                    PRAGMA synchronous = 0;
+                                    PRAGMA cache_size = 1000000;
+                                    PRAGMA locking_mode = EXCLUSIVE;
+                                    PRAGMA temp_store = MEMORY;",
+                                    ).expect("db connection PRAGMA error !");
+            Some(new_conn)
+        },
+        _ => None
     }; 
+
     let mut i: usize = 0;
     for result in results{
-        let valid_res:String = result?.unwrap();
-        handle_content(&valid_res,
-            &config.url_selectors[i],
-            &conn,
-            config.table.clone(),
-            config.save_to_csv.clone()).await.unwrap();
+        let records = result?.unwrap();
+        if records.len() > 0 {
+            let req_id = format!("{}_{}", get_timestamp_now(), i);
+            handle_records(&records, &mut conn, config.table.clone(), config.save_to_csv.clone(), req_id).await.unwrap();
+        }        
         i += 1;
     }
     return Ok(());
 }
 
-pub async fn handle_request(url_selector: UrlSelectorPair) -> Result<String> {
+pub async fn handle_request(client: Client, url_selector: UrlSelectorPair) -> Result<Vec<SelectorRecord>> {
             
+    println!("Sending request ...");
     let start = Instant::now(); 
-    let client = Client::builder().cookie_store(true).build()?;
-    let content = get_body_from(&client, &url_selector.url).await;
-
-    print_all_links(content.as_str()).await;
+    let content = get_body_from(&client, &url_selector.url).await;  
+    println!("Received request content !");
+    print_all_links(&content).await;    
+    let records = extract_selector_records(&content, &url_selector.url, &url_selector.selector).await.unwrap();
     println!("-------------------\nDuration to handle request is: {:?}\n", start.elapsed());
       
-    return Ok(content);
+    return Ok(records);
 }
 
-pub async fn handle_content(content: &str, url_selector: &UrlSelectorPair, conn: &Option<Connection>, table: String, save_to_csv: bool) -> Result<()> {
-    let start = Instant::now();     
-    extract_selector_records(content, 
-                            &url_selector.url, 
-                            &url_selector.selector, 
-                            save_to_csv, 
-                            conn,
-                            &table
-                            ).await.unwrap();
-    println!("__________________\nDuration to handle content is: {:?}\n", start.elapsed());  
-    return Ok(());
 
+pub async fn handle_records(records: &Vec<SelectorRecord>, conn: &mut Option<Connection>, table: String, save_to_csv: bool, req_id: String) -> Result<()> {
+    let start = Instant::now();         
+    
+    if save_to_csv {
+        save_records_to_csv(&records, 
+            std::env::current_dir()?.join(format!("{}{}.csv", CSV_NAME_PREFIX, req_id))
+        ).await.unwrap();
+    };
+    match conn {
+        Some(valid_conn) => save_selector_records_to_db(valid_conn, &table, &records).unwrap(),        
+        _ => {}           
+    };        
+      
+    println!("__________________\nDuration to handle records is: {:?}\n", start.elapsed());  
+    return Ok(());
 }
