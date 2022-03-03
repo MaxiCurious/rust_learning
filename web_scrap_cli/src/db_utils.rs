@@ -48,7 +48,7 @@ mod tests {
 
     #[test]
     fn test_save_selector_records_to_db() {
-        let mut conn = Connection::open(Path::new(&"./test_temp/web_scrap_cli_test.db")).unwrap();
+        let mut conn = Connection::open(Path::new(&"web_scrap_cli_test.db")).unwrap();
         let table = &"selector_record_test";
         let mut records: Vec<SelectorRecord> = Vec::new();
 

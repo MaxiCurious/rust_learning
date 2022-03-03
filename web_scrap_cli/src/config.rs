@@ -126,7 +126,7 @@ mod tests {
         wrong_list_name: 
             - [https://www.google.fr, div]
         "#;
-        _ = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
+        let _result = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
     }
     #[test]
     #[should_panic]
@@ -135,7 +135,7 @@ mod tests {
         url_selector_tuples: 
             - [https://www.google.fr]
         "#;
-        _ = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
+        let _result = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
     }
 
 }
