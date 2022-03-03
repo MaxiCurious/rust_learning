@@ -41,7 +41,7 @@ pub fn save_selector_records_to_db(conn: &mut Connection, table_name: &str, reco
 }
 
 pub fn get_selector_records_from_table(conn: &Connection, table: &str)-> Result<Vec<SelectorRecord>, Box<dyn Error>>{
-    let sql_request = format!("SELECT (timestamp, url, selector, content) FROM {}", table);
+    let sql_request = format!("SELECT timestamp, url, selector, content FROM {}", table);
     let mut stmt = conn.prepare(&sql_request)?;
     let record_iter = stmt.query_map([], |row| {
         Ok(SelectorRecord {
@@ -60,6 +60,18 @@ pub fn get_selector_records_from_table(conn: &Connection, table: &str)-> Result<
     return Ok(records);
 }
 
+pub fn get_db_table_names(conn: &Connection) -> Result<Vec<String>, Box<dyn Error>>{
+    let sql_request = "SELECT name FROM sqlite_schema WHERE type ='table' AND name NOT LIKE 'sqlite_%';";
+    let mut stmt = conn.prepare(&sql_request)?;
+    let rows = stmt.query_map([], |row| row.get(0))?;
+
+    let mut values = Vec::new();
+    for val in rows {
+       values.push(val?);
+    }
+    return Ok(values);
+}
+
 pub fn get_row_count(conn: &Connection, table: &str) -> Result<u32, Box<dyn Error>> {
     let sql_request = format!("SELECT COUNT(*) FROM {}", table);
 
@@ -70,10 +82,42 @@ pub fn get_row_count(conn: &Connection, table: &str) -> Result<u32, Box<dyn Erro
     for val in rows {
        values.push(val?);
     }
-    
-    println!("Got values : {:?}", values);
 
     return Ok(values[0]);
+}
+
+pub fn get_col_names(conn: &Connection, table: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let sql_request = format!("PRAGMA table_info({});", table);
+
+    let mut stmt = conn.prepare(&sql_request)?;
+    let rows = stmt.query_map([], |row| row.get(1))?; // get the second item for the column name
+
+    let mut values = Vec::new();
+    for val in rows {
+       values.push(val?);
+    }
+    return Ok(values);
+}
+
+pub fn _drop_table(conn: &Connection, table: &str) -> Result<(), Box<dyn Error>>{
+    match conn.execute(format!("DROP TABLE {}", table).as_str(), [],) {
+        Ok(_updated) => println!("'{}' has been dropped", table),
+        Err(err) => panic!("DROP TABLE failed: {}", err),
+    }
+    return Ok(());
+}
+
+pub fn print_db_stats(conn: &Connection) -> Result<(), Box<dyn Error>> {
+    println!("--------------\nDatabase Stats:");
+    let table_names = get_db_table_names(&conn)?;
+    for table in table_names{
+        println!(">> '{}' table :", table);
+        println!("Columns : {:?}", get_col_names(conn, &table)?);
+        println!("{:?} rows", get_row_count(conn, &table)?);  
+        let _records = get_selector_records_from_table(conn, &table);
+    }
+    println!("--------------");
+    return Ok(());
 }
 
 #[cfg(test)]
@@ -81,7 +125,7 @@ mod tests {
     use std::path::Path; 
 
     use super::super::*;  // retrieve all from main
-    use super::{get_row_count, get_selector_records_from_table };
+    use super::get_row_count;
 
     #[test]
     fn test_save_selector_records_to_db() {
@@ -109,12 +153,8 @@ mod tests {
         let row_count = get_row_count(&conn, table).unwrap();        
         assert_eq!(row_count, 2, "{:?}", row_count);
 
-        let _rows = get_selector_records_from_table(&conn, table).unwrap();
-
-        match conn.execute(format!("DROP TABLE {}", table).as_str(), [],) {
-            Ok(updated) => println!("{} row inserted in '{}'", updated, table),
-            Err(err) => panic!("DROP TABLE failed: {}", err),
-        }
+        let _result = print_db_stats(&conn);
+        _drop_table(&conn, table).unwrap();
     }
 
 }

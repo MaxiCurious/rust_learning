@@ -25,20 +25,23 @@ pub struct Args {
     pub table: String,
 
     #[clap(long, help="Save results to a csv file")]
-    pub to_csv: bool,    
+    pub to_csv: bool, 
+
+    #[clap(long, help="Print some stats from database records")]
+    pub print_db_stats: bool,     
 }
 
 impl Args{
     pub fn build_config(&self) -> Config{
         let config: Config = match &self.yaml_cfg {
-            Some(v) => Config::new_from_yaml_file(v, &self.to_csv, &self.db).unwrap(),
+            Some(v) => Config::new_from_yaml_file(v, &self.to_csv, &self.db, &self.print_db_stats).unwrap(),
             _ => {
                 let mut url_selector_vec = Vec::new();
                 url_selector_vec.push(
                     UrlSelectorPair{url: self.url.as_ref().unwrap().to_string(),
                                     selector: self.selector.as_ref().unwrap().to_string()}
                 );
-                Config::new(&url_selector_vec, &self.to_csv, &self.db, &self.table)
+                Config::new(&url_selector_vec, &self.to_csv, &self.db, &self.table, &self.print_db_stats)
             }
         };
         return config;
@@ -57,28 +60,30 @@ pub struct Config{
     pub save_to_csv: bool,
     pub db_path: Option<String>,
     pub table: String,
+    pub print_db_stats: bool,
     pub env_arg1: bool
 }
 
 impl Config{
-    pub fn new(url_selectors: &Vec<UrlSelectorPair>, save_to_csv:&bool, db_path: &Option<String>, table: &String) -> Config{   
+    pub fn new(url_selectors: &Vec<UrlSelectorPair>, save_to_csv:&bool, db_path: &Option<String>, table: &String, print_db_stats:&bool) -> Config{   
         let env_arg1 = env::var("WEB_SCRAP_CLI_ARG1").is_err();        
         return Config {url_selectors: url_selectors.clone(), 
             save_to_csv: save_to_csv.clone(),
             db_path: db_path.clone(),
             table: table.clone(),
+            print_db_stats: print_db_stats.clone(),
             env_arg1};
     }
 
-    pub fn new_from_yaml_file(yaml_cfg: &String, save_to_csv:&bool, db_path: &Option<String>) -> Result<Config, Box<dyn Error>>{
+    pub fn new_from_yaml_file(yaml_cfg: &String, save_to_csv:&bool, db_path: &Option<String>, print_db_stats: &bool) -> Result<Config, Box<dyn Error>>{
         println!("Current dir : {:?}", std::env::current_dir());
         println!("Current exe: {:?}", std::env::current_exe());
 
         let content = file_utils::get_file_content((&yaml_cfg).to_string()).expect("Can't get yaml file content !");
-        return Config::new_from_yaml_string(&content, save_to_csv, db_path);
+        return Config::new_from_yaml_string(&content, save_to_csv, db_path, print_db_stats);
     }
 
-    pub fn new_from_yaml_string(yaml_content: &str, save_to_csv:&bool, db_path: &Option<String>)-> Result<Config, Box<dyn Error>>{
+    pub fn new_from_yaml_string(yaml_content: &str, save_to_csv:&bool, db_path: &Option<String>, print_db_stats: &bool)-> Result<Config, Box<dyn Error>>{
         let yaml_vec = YamlLoader::load_from_str(yaml_content)?;   
         let yaml = &yaml_vec[0] ;
 
@@ -91,7 +96,7 @@ impl Config{
                 UrlSelectorPair{url: yaml_item[0].as_str().unwrap().to_string(),
                                 selector: yaml_item[1].as_str().unwrap().to_string()})
         }
-        return Ok(Config::new(&url_selectors, save_to_csv, db_path, &String::from("selector_record")));
+        return Ok(Config::new(&url_selectors, save_to_csv, db_path, &String::from("selector_record"), print_db_stats));
     }
 
     pub fn print_info(&self){
@@ -109,7 +114,7 @@ mod tests {
         url_selector_tuples: 
             - [https://www.google.fr, div]
         "#;
-        let config = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
+        let config = Config::new_from_yaml_string(&fake_yaml_content, &false, &None, &false);
         assert!(config.is_ok(), "{}", format!("config = {:#?}", config));  
 
         let config_ok = &config.unwrap();
@@ -126,7 +131,7 @@ mod tests {
         wrong_list_name: 
             - [https://www.google.fr, div]
         "#;
-        let _result = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
+        let _result = Config::new_from_yaml_string(&fake_yaml_content, &false, &None, &false);
     }
     #[test]
     #[should_panic]
@@ -135,7 +140,7 @@ mod tests {
         url_selector_tuples: 
             - [https://www.google.fr]
         "#;
-        let _result = Config::new_from_yaml_string(&fake_yaml_content, &false, &None);
+        let _result = Config::new_from_yaml_string(&fake_yaml_content, &false, &None, &false);
     }
 
 }

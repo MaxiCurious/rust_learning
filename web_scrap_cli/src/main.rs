@@ -15,12 +15,11 @@ mod scrap_utils;
 use scrap_utils::*;
 
 mod file_utils;
-use file_utils::{save_records_to_csv, get_timestamp_now};
+use file_utils::*;
 
 mod db_utils;
-use db_utils::save_selector_records_to_db;
+use db_utils::*;
 
-// Not in parallel : Total duration = 1.9254413 sec.
 
 const CSV_NAME_PREFIX: &str = "selector_items_";
 
@@ -93,6 +92,13 @@ pub async fn run(config: Config) -> Result<()>{
         }        
         i += 1;
     }
+
+    if config.print_db_stats {
+        if let Some(valid_conn) = conn {
+            print_db_stats(&valid_conn).expect("Couldn't get database stats");
+        }
+    }
+         
     return Ok(());
 }
 
