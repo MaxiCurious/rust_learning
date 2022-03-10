@@ -11,7 +11,8 @@ fn create_selector_record_table(conn: &Connection, table_name: &str) -> Result<(
                   timestamp       TIMESTAMP,
                   url             TEXT NOT NULL,
                   selector        TEXT NOT NULL,
-                  content         TEXT
+                  content         TEXT,
+                  host            TEXT NOT NULL
                   )", table_name).as_str(),
         [],
     )?;
@@ -22,11 +23,11 @@ pub fn save_selector_records_to_db(conn: &mut Connection, table_name: &str, reco
     
     create_selector_record_table(&conn, table_name)?;
     let transaction = conn.transaction().unwrap(); 
-    let stmt_template = format!("INSERT INTO {} (timestamp, url, selector, content) VALUES (?1, ?2, ?3, ?4)", table_name);
+    let stmt_template = format!("INSERT INTO {} (timestamp, url, selector, content, host) VALUES (?1, ?2, ?3, ?4, ?5)", table_name);
     let mut stmt = transaction.prepare_cached(&stmt_template).unwrap();
                             
     for record in records{
-        stmt.execute(params![record.timestamp, record.url, record.selector, record.content]).unwrap();
+        stmt.execute(params![record.timestamp, record.url, record.selector, record.content, record.host]).unwrap();
     //     match &conn.execute(format!("INSERT INTO {} (timestamp, url, selector, content) VALUES (?1, ?2, ?3, ?4)", table_name).as_str(),
     //                         params![record.timestamp, record.url, record.selector, record.content]) 
     //     {
@@ -44,12 +45,7 @@ pub fn get_selector_records_from_table(conn: &Connection, table: &str)-> Result<
     let sql_request = format!("SELECT timestamp, url, selector, content FROM {}", table);
     let mut stmt = conn.prepare(&sql_request)?;
     let record_iter = stmt.query_map([], |row| {
-        Ok(SelectorRecord {
-            timestamp: row.get(0)?,
-            url: row.get(1)?,
-            selector: row.get(2)?,
-            content: row.get(3)?
-        })
+        Ok(SelectorRecord::new(row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
     })?;
 
     let mut records = Vec::new();
@@ -138,16 +134,16 @@ mod tests {
         }
         
         let mut records: Vec<SelectorRecord> = Vec::new();
-        records.push(SelectorRecord{timestamp: get_timestamp_now(),
-                                    url: String::from(r"http:\\www.test.fr"),
-                                    selector: String::from("a"),
-                                    content: String::from("blablabla")}
-                    );
-        records.push(SelectorRecord{timestamp: get_timestamp_now(),
-            url: String::from(r"http:\\www.test.fr"),
-            selector: String::from("p"),
-            content: String::from("blibli")}
-        );
+        records.push(SelectorRecord::new(get_timestamp_now(), 
+                                    String::from(r"http:\\www.test.fr"),
+                                    String::from("a"),
+                                    String::from("blablabla")
+                                ));
+        records.push(SelectorRecord::new(get_timestamp_now(), 
+                                String::from(r"http:\\www.test-other.fr"),
+                                String::from("p"),
+                                String::from("bliblibli")
+                            ));
 
         save_selector_records_to_db(&mut conn, table, &records).unwrap();
         let row_count = get_row_count(&conn, table).unwrap();        

@@ -21,7 +21,7 @@ mod db_utils;
 use db_utils::*;
 
 
-const CSV_NAME_PREFIX: &str = "selector_items_";
+const CSV_NAME_PREFIX: &str = "records_";
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -119,9 +119,9 @@ pub async fn handle_request(client: Client, url_selector: UrlSelectorPair) -> Re
 pub async fn handle_records(records: &Vec<SelectorRecord>, conn: &mut Option<Connection>, table: String, save_to_csv: bool, req_id: String) -> Result<()> {
     let start = Instant::now();         
     
-    if save_to_csv {
+    if save_to_csv {        
         save_records_to_csv(&records, 
-            std::env::current_dir()?.join(format!("{}{}.csv", CSV_NAME_PREFIX, req_id))
+            std::env::current_dir()?.join(format!("{}{}_{}.csv", CSV_NAME_PREFIX, &records[0].host, req_id))
         ).await.unwrap();
     };
     match conn {

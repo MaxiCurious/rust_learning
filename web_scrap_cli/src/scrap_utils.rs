@@ -5,6 +5,7 @@ use select::document::Document;
 use select::predicate::Name;
 use serde::{Serialize, Deserialize};
 use regex::{RegexSet, Regex};
+use url::Url;
 
 use  super::file_utils::get_timestamp_now;
 
@@ -15,6 +16,14 @@ pub struct SelectorRecord {
     pub url: String,
     pub selector: String,
     pub content: String,
+    pub host: String
+}
+
+impl SelectorRecord{
+    pub fn new(timestamp: u64, url: String, selector: String, content: String) -> SelectorRecord{
+        let host:String = get_host_from_url(&url).unwrap();
+        return SelectorRecord{timestamp, url, selector, content, host}
+    }
 }
 
 pub async fn get_body_from(client: &Client, url: &str) -> String{
@@ -44,10 +53,16 @@ pub async fn get_css_selector_items(content: &str,  selector: &str) -> Vec<Strin
     
 }
 
+pub fn get_host_from_url(url: &str) -> Result<String, Box<dyn Error>> {
+    let url = Url::parse(url)?;
+    let host: String = format!("{}", url.host().unwrap());
+    //assert_eq!(url.scheme(), "ftp");
+    //assert_eq!(url.host(), Some(Host::Domain("rust-lang.org")));
+    //assert_eq!(url.port_or_known_default(), Some(21));
+    Ok(host)
+}
 
-
-pub async fn extract_selector_records(content: &str, valid_url: &str, selector: &str) -> Result<Vec<SelectorRecord>, Box<dyn Error>>{
-    
+pub async fn extract_selector_records(content: &str, valid_url: &str, selector: &str) -> Result<Vec<SelectorRecord>, Box<dyn Error>>{    
     println!("\nExtracting '{}' CSS Selector items ...", selector);  
     let timestamp = get_timestamp_now();                                          
     
@@ -67,11 +82,7 @@ pub async fn extract_selector_records(content: &str, valid_url: &str, selector: 
         if regex_set.is_match(item){
             let cleaned_item = re.replace_all(item, " ").to_string();
             println!("{}", cleaned_item);
-            records.push(SelectorRecord{timestamp,
-                url: String::from(valid_url),
-                selector: String::from(selector),
-                content: cleaned_item
-            });
+            records.push(SelectorRecord::new(timestamp, String::from(valid_url), String::from(selector), cleaned_item));
         }                        
     }
     println!("-------------------\nFound {} items matching regex, for selector '{}' !", records.len(), selector);
