@@ -22,12 +22,13 @@ pub async fn get_body_from(client: &Client, url: &str) -> String{
     return response.expect("Error in the response");     
 }
 
-pub async fn print_all_links(content: &str){
+pub async fn extract_all_links(content: &str) -> Vec<String>{
     println!("Links in the page :\n");
-    Document::from(content)
-        .find(Name("a"))
-        .filter_map(|n| n.attr("href"))
-        .for_each(|x| println!("{}", x));
+    let links: Vec<String> = Document::from(content).find(Name("a"))                                  
+                                  .filter_map(|n| n.attr("href"))
+                                  .map(|s| String::from(s))
+                                  .collect::<Vec<String>>();
+    return links;
 }
 
 pub async fn get_css_selector_items(content: &str,  selector: &str) -> Vec<String>{

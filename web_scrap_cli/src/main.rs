@@ -57,7 +57,7 @@ pub async fn run(config: Config) -> Result<()>{
     
     let client = Client::builder().cookie_store(true).build()?;
 
-    // separate threads for parrallism
+    // separate threads for parrallel execution
     let mut futures = vec![];    
     for url_selector in &config.url_selectors {
         let fut = task::spawn(handle_request(client.clone(), url_selector.clone())
@@ -65,7 +65,7 @@ pub async fn run(config: Config) -> Result<()>{
         futures.push(fut);               
     }
 
-    // Retrieve all selector items 
+    // Retrieve all selector items in results
     let results = join_all(futures).await;
 
     // Setup db connection if required
@@ -108,7 +108,7 @@ pub async fn handle_request(client: Client, url_selector: UrlSelectorPair) -> Re
     let start = Instant::now(); 
     let content = get_body_from(&client, &url_selector.url).await;  
     println!("Received request content !");
-    print_all_links(&content).await;    
+    let _links = extract_all_links(&content).await;    
     let records = extract_selector_records(&content, &url_selector.url, &url_selector.selector).await.unwrap();
     println!("-------------------\nDuration to handle request is: {:?}\n", start.elapsed());
       
